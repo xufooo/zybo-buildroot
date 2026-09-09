@@ -56,7 +56,10 @@ zybo-buildroot/
 # 3) copy the boot files to the FAT32 partition, write rootfs.ext4 to the ext4 partition
 ```
 
-`uEnv.txt` programs the PL from `system.bit` and then boots the kernel.
+`make_bootbin.sh` generates `boot.scr` (a U-Boot script that `distro_bootcmd`
+executes automatically): it loads `system.bit` with `fpga loadb`, then boots
+`uImage` with `zybo-audio.dtb`. A minimal `uEnv.txt` is also written for
+loaders that import it. `mkimage` is required (`uboot-tools`).
 
 ## Related
 
