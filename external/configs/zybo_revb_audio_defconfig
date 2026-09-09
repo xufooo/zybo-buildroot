@@ -60,7 +60,7 @@ BR2_TARGET_ROOTFS_TAR=y
 # BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/post-image.sh"
 
 # Rootfs overlay
-BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/rootfs_overlay"
+# BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/rootfs_overlay"
 
 # ── Packages：Phase 1（先出声）──────────────────────────────────────────
 # ALSA 工具（aplay / amixer / speaker-test）

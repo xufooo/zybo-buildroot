@@ -40,7 +40,7 @@ zybo-buildroot/
 ├── .github/workflows/build-rootfs.yml
 ├── external/                            # BR2_EXTERNAL tree
 │   ├── configs/zybo_revb_audio_defconfig
-│   ├── board/zybo-revb/                 # linux.fragment, post-build.sh, rootfs_overlay
+│   ├── board/zybo-revb/                 # linux.fragment, post-build.sh
 │   └── overlays/zybo-audio.dts
 ├── buildroot_setup.sh                   # local equivalent (setup / build / rebuild / clean)
 └── make_bootbin.sh                      # assemble SD-card boot files (needs a bitstream)
