@@ -58,13 +58,6 @@ zybo-buildroot/
 
 `uEnv.txt` programs the PL from `system.bit` and then boots the kernel.
 
-## On-board check
-
-`bringup_check.sh` is installed into the rootfs overlay at
-`/usr/local/bin/bringup_check.sh`. It checks the board model, audio drivers,
-the codec on I2C (`0x1A`), ALSA cards/PCMs, `speaker-test`, mixer controls,
-`arecord` and the relevant kernel log lines.
-
 ## Related
 
 - Kernel build: [zybo-linux](https://github.com/xufooo/zybo-linux)
