@@ -1,0 +1,5 @@
+# 构建产物
+buildroot/
+br2-dl/
+output/
+sdcard-boot/

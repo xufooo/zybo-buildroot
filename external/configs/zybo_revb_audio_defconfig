@@ -1,0 +1,96 @@
+# Buildroot Defconfig — ZYBO Audio DSP (Buildroot 2024.02)
+# Architecture: ARM Cortex-A9, Zynq-7000 XC7Z010
+BR2_arm=y
+BR2_cortex_a9=y
+BR2_ARM_ENABLE_NEON=y
+BR2_ARM_ENABLE_VFP=y
+BR2_ARM_FPU_VFPV3D16=y
+
+# Toolchain: Bootlin 预编译外部工具链（省去自建 gcc/glibc；Buildroot 2024.02 内置 2023.11-1）
+BR2_TOOLCHAIN_EXTERNAL=y
+BR2_TOOLCHAIN_EXTERNAL_BOOTLIN=y
+BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_ARMV7_EABIHF_GLIBC_STABLE=y
+
+# System
+BR2_TARGET_GENERIC_HOSTNAME="zybo-audio"
+BR2_TARGET_GENERIC_ISSUE="ZYBO Audio DSP"
+BR2_INIT_BUSYBOX=y
+BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_DEVTMPFS=y
+
+# Kernel: linux-xlnx 6.6 LTS（tag 锁定，Vitis 2024.1 官方线 + 上游 stable 修复）
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_GIT=y
+BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Xilinx/linux-xlnx.git"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="xlnx_rebase_v6.6_LTS_2024.1_merge_6.6.80"
+BR2_LINUX_KERNEL_DEFCONFIG="xilinx_zynq"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/linux.fragment"
+BR2_LINUX_KERNEL_UIMAGE=y
+BR2_LINUX_KERNEL_UIMAGE_LOADADDR="0x00008000"
+BR2_LINUX_KERNEL_DTS_SUPPORT=y
+# ZYBO Rev B 音频自定义 DTS（叠加到 xlnx zynq-zybo 上，见 external/overlays/zybo-audio.dts）
+BR2_LINUX_KERNEL_CUSTOM_DTS_PATH="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/overlays/zybo-audio.dts"
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="zybo-audio"
+
+# Boot: U-Boot 2024.01（Zynq-7000 通用配置 xilinx_zynq_virt + DEVICE_TREE=zynq-zybo）
+# BOOT.BIN = SPL 的 spl/boot.bin（BootROM 直接加载，无需 FSBL/bootgen）；bitstream 由 U-Boot 的
+# uEnv.txt 用 `fpga loadb` 加载（与 meta-xilinx 官方 zybo-zynq7 做法一致）
+BR2_TARGET_UBOOT=y
+BR2_TARGET_UBOOT_BUILD_SYSTEM_KCONFIG=y
+BR2_TARGET_UBOOT_CUSTOM_GIT=y
+BR2_TARGET_UBOOT_CUSTOM_REPO_URL="https://source.denx.de/u-boot/u-boot.git"
+BR2_TARGET_UBOOT_CUSTOM_REPO_VERSION="v2024.01"
+BR2_TARGET_UBOOT_BOARD_DEFCONFIG="xilinx_zynq_virt"
+BR2_TARGET_UBOOT_CUSTOM_MAKEOPTS="DEVICE_TREE=zynq-zybo"
+BR2_TARGET_UBOOT_NEEDS_DTC=y
+BR2_TARGET_UBOOT_NEEDS_PYTHON3=y
+BR2_TARGET_UBOOT_NEEDS_PYLIBFDT=y
+BR2_TARGET_UBOOT_SPL=y
+BR2_TARGET_UBOOT_SPL_NAME="spl/boot.bin"
+BR2_TARGET_UBOOT_FORMAT_IMG=y
+
+# Root filesystem
+BR2_TARGET_ROOTFS_EXT2=y
+BR2_TARGET_ROOTFS_EXT2_4=y
+BR2_TARGET_ROOTFS_EXT2_SIZE="256M"
+BR2_TARGET_ROOTFS_TAR=y
+
+# SD card（v1：不做 sdcard.img —— BOOT.BIN 依赖 FPGA .xsa + bootgen，CI 只出镜像原料）
+# 待 FPGA 产物就绪后再接入 genimage + BOOT.BIN，产出可烧录 sdcard.img
+# BR2_PACKAGE_HOST_GENIMAGE=y
+# BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/post-image.sh"
+
+# Rootfs overlay
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/rootfs_overlay"
+
+# ── Packages：Phase 1（先出声）──────────────────────────────────────────
+# ALSA 工具（aplay / amixer / speaker-test）
+BR2_PACKAGE_ALSA_LIB=y
+BR2_PACKAGE_ALSA_UTILS=y
+BR2_PACKAGE_ALSA_UTILS_APLAY=y
+BR2_PACKAGE_ALSA_UTILS_AMIXER=y
+BR2_PACKAGE_ALSA_UTILS_SPEAKER_TEST=y
+# I2C 工具（i2cdetect 验证 codec 0x1A）
+BR2_PACKAGE_I2C_TOOLS=y
+
+# ── Phase 2/4：出声验证通过后再逐个打开（Buildroot 增量构建很快）──────────
+# # Audio decoding
+# BR2_PACKAGE_LIBSNDFILE=y
+# BR2_PACKAGE_MPG123=y
+# BR2_PACKAGE_FLAC=y
+# BR2_PACKAGE_LIBMAD=y
+# BR2_PACKAGE_LIBVORBIS=y
+# # MPD
+# BR2_PACKAGE_MPD=y
+# BR2_PACKAGE_MPD_ALSA=y
+# BR2_PACKAGE_MPD_FLAC=y
+# BR2_PACKAGE_MPD_MAD=y
+# BR2_PACKAGE_MPD_VORBIS=y
+# BR2_PACKAGE_MPD_LIBNFS=y
+# BR2_PACKAGE_MPD_CURL=y
+# # 网络文件系统 / 串流
+# BR2_PACKAGE_CIFS_UTILS=y
+# BR2_PACKAGE_LIBNFS=y
+# BR2_PACKAGE_LIBCURL=y
+# BR2_PACKAGE_SHAIRPORT_SYNC=y
+# # 远程登录（调试用，可选 dropbear 更轻）
+# BR2_PACKAGE_DROPBEAR=y

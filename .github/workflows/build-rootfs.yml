@@ -1,0 +1,108 @@
+# ============================================================================
+# build-rootfs.yml — ZYBO Rev B 音频 Linux（Buildroot）GitHub Actions 构建
+# ============================================================================
+# 产物（artifact: linux-images）：
+#   boot.bin（=BOOT.BIN, U-Boot SPL）、u-boot.img、uImage、zybo-audio.dtb、
+#   rootfs.ext4、rootfs.tar
+# 说明：
+#   - Buildroot 2026.02.3（LTS）+ BR2_EXTERNAL=external（本仓库根）
+#   - 外部预编译工具链（Bootlin armv7-eabihf glibc stable）→ 跳过自建 gcc/glibc
+#   - Phase-1 精简包：alsa-utils + i2c-tools（MPD/AirPlay 后续增量加）
+#   - bitstream 不在 CI 生成（需 Vivado）：产物下载后本地 `make bootbin --bit ...` 组卡
+#   - runner: ubuntu-24.04（tar 1.35，满足 Buildroot ≥1.35 要求，免自建 host-tar）
+# ============================================================================
+name: Build ZYBO Linux Rootfs (Buildroot)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'external/**'
+      - 'buildroot_setup.sh'
+      - '.github/workflows/build-rootfs.yml'
+
+concurrency:
+  group: zybo-buildroot
+  cancel-in-progress: true
+
+env:
+  BUILDROOT_VERSION: '2026.02.3'
+  BR_DIR: buildroot
+  DL_DIR: ${{ github.workspace }}/br2-dl
+
+jobs:
+  build:
+    name: Build Buildroot image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Install host dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential cpio file flex git libncurses-dev \
+            libssl-dev python3 rsync unzip wget
+
+      - name: Cache Buildroot downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DL_DIR }}
+          key: br2-dl-${{ env.BUILDROOT_VERSION }}-${{ hashFiles('external/configs/*') }}
+          restore-keys: br2-dl-${{ env.BUILDROOT_VERSION }}-
+
+      - name: Clone Buildroot
+        run: |
+          git clone --depth 1 --branch $BUILDROOT_VERSION \
+            https://github.com/buildroot/buildroot.git $BR_DIR
+
+      - name: Configure (BR2_EXTERNAL + defconfig)
+        run: |
+          cd $BR_DIR
+          make BR2_EXTERNAL=$GITHUB_WORKSPACE/external \
+               BR2_DL_DIR=$DL_DIR \
+               zybo_revb_audio_defconfig
+          grep -E 'BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_ARMV7|BR2_TARGET_UBOOT_BOARD_DEFCONFIG|BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION|BR2_TARGET_UBOOT_SPL_NAME' .config
+
+      - name: Build
+        run: |
+          cd $BR_DIR
+          make BR2_DL_DIR=$DL_DIR -j$(nproc)
+
+      - name: List images
+        run: ls -la $BR_DIR/output/images/
+
+      - name: Upload images artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-images
+          path: |
+            ${{ env.BR_DIR }}/output/images/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ${{ env.BR_DIR }}/output/build/*/build.log
+            ${{ env.BR_DIR }}/output/build/*/config.log
+          if-no-files-found: ignore
+          retention-days: 7
