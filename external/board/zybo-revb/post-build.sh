@@ -1,28 +1,18 @@
 #!/bin/sh
 # ============================================================================
-# post-build.sh — ZYBO Z7 Root FS Post-Build Hook
+# post-build.sh — ZYBO Rev B 音频：写入 ALSA 默认设备配置
 # ============================================================================
-# Called by Buildroot after rootfs is assembled but before image generation.
-# Arguments: $1 = target/   $2 = TARGET_DIR
-#
-# Do:
-#   1. Generate BOOT.BIN from U-Boot SPL + FSBL (Vivado .hdf)
-#   2. Copy kernel image + device tree to boot partition
-#   3. Create /etc/asound.conf for default audio device
-#   4. Set up startup scripts
+# Buildroot 调用约定：$1 = TARGET_DIR（rootfs 的 target 目录）
+# 只做一件必要的事：写 /etc/asound.conf（44.1k 素材靠 plug 重采样到 48k，
+# 因为 codec MCLK 固定 12.288MHz = 256×48kHz）。
 # ============================================================================
-
 set -e
-set -x
 
-TARGET_DIR="${1}/target"
+TARGET_DIR="${1:?usage: post-build.sh TARGET_DIR}"
 
-echo "=== ZYBO Audio DSP: post-build ==="
-
-# ── Create /etc/asound.conf (ALSA default device) ────────────────────────
 mkdir -p "${TARGET_DIR}/etc"
 cat > "${TARGET_DIR}/etc/asound.conf" << 'EOF'
-# ALSA default PCM device — ZYBO Audio DSP
+# 默认 PCM：软件重采样到 48kHz / S24_LE / 2ch（MCLK 固定 12.288MHz）
 pcm.!default {
     type plug
     slave {
@@ -38,25 +28,3 @@ ctl.!default {
     card 0
 }
 EOF
-
-# ── Create startup banner ────────────────────────────────────────────────
-cat > "${TARGET_DIR}/etc/motd" << 'EOF'
-╔══════════════════════════════════════════════════╗
-║         ZYBO Z7 Audio DSP — Buildroot Linux      ║
-║         Kernel: linux-xlnx 6.6 LTS                  ║
-║         Audio: SSM2603 + FPGA DSP                 ║
-╚══════════════════════════════════════════════════╝
-
-  aplay -l          list audio devices
-  speaker-test      test audio output
-  amixer scontrols  list mixer controls
-
-EOF
-
-# ── Enable getty on ttyPS0 at startup ────────────────────────────────────
-ln -sf /etc/init.d/S50getty "${TARGET_DIR}/etc/init.d/S50getty_ttyPS0" 2>/dev/null || true
-
-# ── Create /mnt/sd for SD card mount ────────────────────────────────────
-mkdir -p "${TARGET_DIR}/mnt/sd"
-
-echo "=== Post-build complete ==="

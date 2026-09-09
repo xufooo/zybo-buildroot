@@ -61,6 +61,8 @@ BR2_TARGET_ROOTFS_TAR=y
 
 # Rootfs overlay
 # BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/rootfs_overlay"
+# post-build：写 /etc/asound.conf（44.1k → 48k plug 重采样）
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/post-build.sh"
 
 # ── Packages：Phase 1（先出声）──────────────────────────────────────────
 # ALSA 工具（aplay / amixer / speaker-test）
@@ -72,25 +74,4 @@ BR2_PACKAGE_ALSA_UTILS_SPEAKER_TEST=y
 # I2C 工具（i2cdetect 验证 codec 0x1A）
 BR2_PACKAGE_I2C_TOOLS=y
 
-# ── Phase 2/4：出声验证通过后再逐个打开（Buildroot 增量构建很快）──────────
-# # Audio decoding
-# BR2_PACKAGE_LIBSNDFILE=y
-# BR2_PACKAGE_MPG123=y
-# BR2_PACKAGE_FLAC=y
-# BR2_PACKAGE_LIBMAD=y
-# BR2_PACKAGE_LIBVORBIS=y
-# # MPD
-# BR2_PACKAGE_MPD=y
-# BR2_PACKAGE_MPD_ALSA=y
-# BR2_PACKAGE_MPD_FLAC=y
-# BR2_PACKAGE_MPD_MAD=y
-# BR2_PACKAGE_MPD_VORBIS=y
-# BR2_PACKAGE_MPD_LIBNFS=y
-# BR2_PACKAGE_MPD_CURL=y
-# # 网络文件系统 / 串流
-# BR2_PACKAGE_CIFS_UTILS=y
-# BR2_PACKAGE_LIBNFS=y
-# BR2_PACKAGE_LIBCURL=y
-# BR2_PACKAGE_SHAIRPORT_SYNC=y
-# # 远程登录（调试用，可选 dropbear 更轻）
-# BR2_PACKAGE_DROPBEAR=y
+# ── Phase 2/4（暂不启用）：MPD / shairport-sync / dropbear 等，出声验证后再加 ──
