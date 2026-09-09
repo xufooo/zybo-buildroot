@@ -79,6 +79,12 @@ jobs:
                zybo_revb_audio_defconfig
           grep -E 'BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_ARMV7|BR2_TARGET_UBOOT_BOARD_DEFCONFIG|BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION|BR2_TARGET_UBOOT_SPL_NAME' .config
 
+      - name: Fix script permissions
+        run: |
+          # git 可能丢失可执行位；Buildroot 直接执行 post-build 脚本，必须可执行
+          chmod +x external/board/zybo-revb/post-build.sh buildroot_setup.sh make_bootbin.sh 2>/dev/null || true
+          ls -l external/board/zybo-revb/post-build.sh
+
       - name: Build
         run: |
           cd $BR_DIR
