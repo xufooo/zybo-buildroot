@@ -1,48 +1,70 @@
-# zybo-buildroot — ZYBO Rev B 音频 Linux 根文件系统（Buildroot）
+# zybo-buildroot
 
-用 **GitHub Actions** 构建 Buildroot 镜像（BR2_EXTERNAL 板级配置在本仓库根目录）。
+Buildroot rootfs for a ZYBO (Zynq-7000) audio player.
 
-## 内容
+Builds a complete SD-card boot set on GitHub Actions from a `BR2_EXTERNAL`
+tree kept in this repository.
+
+## What it builds
+
+| Item | Value |
+|---|---|
+| Buildroot | `2026.02.3` (LTS) |
+| Toolchain | Bootlin prebuilt `armv7-eabihf--glibc--stable` (no self-built toolchain) |
+| Kernel | Xilinx `linux-xlnx`, tag `xlnx_rebase_v6.6_LTS_2024.1_merge_6.6.80` |
+| Device tree | `external/overlays/zybo-audio.dts` |
+| U-Boot | v2024.01, `xilinx_zynq_virt` + `DEVICE_TREE=zynq-zybo`, SPL (`spl/boot.bin`) |
+| Packages (phase 1) | `alsa-utils` (aplay / amixer / speaker-test), `i2c-tools` |
+| Rootfs | ext4 + tar, rootfs overlay under `external/board/zybo-revb/` |
+
+`BOOT.BIN` is the U-Boot SPL image (`boot.bin`); no FSBL/bootgen is required.
+The PL bitstream is loaded by U-Boot from `uEnv.txt` via `fpga loadb`.
+
+## CI artifacts
+
+Artifact `linux-images`:
+
+```
+boot.bin        # = BOOT.BIN (U-Boot SPL)
+u-boot.img      # U-Boot proper (SPL payload)
+uImage          # kernel
+zybo-audio.dtb  # device tree with audio nodes
+rootfs.ext4     # root filesystem
+rootfs.tar
+```
+
+## Layout
 
 ```
 zybo-buildroot/
-├── .github/workflows/build-rootfs.yml   # Actions：Buildroot 2026.02.3 全量构建
-├── external/                            # BR2_EXTERNAL 树
+├── .github/workflows/build-rootfs.yml
+├── external/                            # BR2_EXTERNAL tree
 │   ├── configs/zybo_revb_audio_defconfig
-│   ├── board/zybo-revb/                 # linux.fragment、post-build.sh、rootfs_overlay
-│   └── overlays/zybo-audio.dts          # 音频 PL overlay（DMA/PL330/i2s/iic/sound）
-├── buildroot_setup.sh                   # 本地等价流程（setup/build/rebuild/clean）
-├── make_bootbin.sh                      # 组装 SD 卡启动文件（需本地 bitstream）
-└── README.md
+│   ├── board/zybo-revb/                 # linux.fragment, post-build.sh, rootfs_overlay
+│   └── overlays/zybo-audio.dts
+├── buildroot_setup.sh                   # local equivalent (setup / build / rebuild / clean)
+└── make_bootbin.sh                      # assemble SD-card boot files (needs a bitstream)
 ```
 
-## Actions 产物（artifact `linux-images`）
-
-`boot.bin`（=BOOT.BIN，U-Boot SPL）、`u-boot.img`、`uImage`、`zybo-audio.dtb`、
-`rootfs.ext4`、`rootfs.tar`
-
-## 关键配置
-
-| 项 | 值 |
-|---|---|
-| Buildroot | **2026.02.3**（LTS；要求宿主 tar ≥1.35，runner ubuntu-24.04 满足） |
-| 工具链 | **Bootlin 预编译** `armv7-eabihf--glibc--stable`（跳过自建 gcc/glibc） |
-| 内核 | linux-xlnx **tag** `xlnx_rebase_v6.6_LTS_2024.1_merge_6.6.80`（与 Vivado 2024.1 配套） |
-| U-Boot | v2024.01，`xilinx_zynq_virt` + `DEVICE_TREE=zynq-zybo`，SPL（`spl/boot.bin`） |
-| 音频 | 主线 ASoC：`adi,axi-i2s`(PL330) + `ssm2602/2603` + `simple-audio-card` |
-| Phase-1 包 | `alsa-utils`(aplay/amixer/speaker-test) + `i2c-tools` |
-
-## 组装 SD 卡
+## Assembling an SD card
 
 ```bash
-# 1) 下载 Actions artifact 到本地（解压出 images/）
-# 2) 用 FPGA 侧 bitstream 组装启动文件
-./make_bootbin.sh --bit /path/to/zybo_audio_wrapper.bit --images /path/to/images --out ./sdcard-boot
+# 1) download the CI artifact and unpack images/
+# 2) combine the boot files with the PL bitstream from Vivado
+./make_bootbin.sh --bit zybo_audio_wrapper.bit --images ./images --out ./sdcard-boot
 # → sdcard-boot/{BOOT.BIN,u-boot.img,uImage,zybo-audio.dtb,system.bit,uEnv.txt}
-# 3) 拷入 SD 卡 FAT32 分区（rootfs.ext4 写到 ext4 分区）
+# 3) copy the boot files to the FAT32 partition, write rootfs.ext4 to the ext4 partition
 ```
 
-## 上板验证顺序
+`uEnv.txt` programs the PL from `system.bit` and then boots the kernel.
 
-`i2cdetect` 见 0x1A（codec）→ `aplay -l` 见声卡 → `speaker-test -r 48000` →
-44.1k 素材 `aplay`（`plug` 重采样）→ `arecord`。
+## On-board check
+
+`bringup_check.sh` is installed into the rootfs overlay at
+`/usr/local/bin/bringup_check.sh`. It checks the board model, audio drivers,
+the codec on I2C (`0x1A`), ALSA cards/PCMs, `speaker-test`, mixer controls,
+`arecord` and the relevant kernel log lines.
+
+## Related
+
+- Kernel build: [zybo-linux](https://github.com/xufooo/zybo-linux)
