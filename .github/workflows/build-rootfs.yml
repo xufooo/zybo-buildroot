@@ -39,21 +39,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check DTS sync with zybo-linux (canonical)
+      - name: Check DTS/config sync with zybo-linux (canonical)
         run: |
-          # external/overlays/zybo-audio.dts 是 zybo-linux 仓 kernel/zybo-audio.dts 的副本
-          # （保留副本 = 构建自包含/可复现）。权威版本在 zybo-linux，这里做漂移检测：
-          # 2026-09-10 曾因两份副本不同步（缺 interrupt-parent / clocks）导致 CI 编出的
-          # DTB 上板后 codec 不 probe。比较时去掉注释与空行（副本头部多一段说明）。
-          curl -fsSL -o /tmp/zybo-audio-canonical.dts \
-            https://raw.githubusercontent.com/xufooo/zybo-linux/main/kernel/zybo-audio.dts
+          # external/overlays/zybo-audio.dts 与 external/board/zybo-revb/linux.fragment
+          # 都是 zybo-linux 仓里同名文件的副本（保留副本 = 构建自包含/可复现）。
+          # 权威版本在 zybo-linux，这里做漂移检测：2026-09-10 曾因 DTS 副本不同步
+          # （缺 interrupt-parent / clocks）导致 CI 编出的 DTB 上板后 codec 不 probe。
+          fetch() {
+            curl -fsSL -o "/tmp/canonical-$1" \
+              "https://raw.githubusercontent.com/xufooo/zybo-linux/main/kernel/$1"
+          }
+          fail=0
+          # DTS：去掉注释与空行再比（副本头部多一段说明）
+          fetch zybo-audio.dts
           strip() { grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$'; }
-          if ! diff -u <(strip /tmp/zybo-audio-canonical.dts) \
+          if ! diff -u <(strip /tmp/canonical-zybo-audio.dts) \
                        <(strip external/overlays/zybo-audio.dts); then
             echo "::error::external/overlays/zybo-audio.dts 与 zybo-linux 权威版本已漂移，请同步"
-            exit 1
+            fail=1
           fi
-          echo "DTS 与 zybo-linux 权威版本一致"
+          # fragment：应当逐字节一致
+          fetch config.fragment
+          if ! diff -u /tmp/canonical-config.fragment \
+                       external/board/zybo-revb/linux.fragment; then
+            echo "::error::external/board/zybo-revb/linux.fragment 与 zybo-linux 权威版本已漂移，请同步"
+            fail=1
+          fi
+          [ "$fail" = "0" ] && echo "DTS 与 config fragment 均与 zybo-linux 权威版本一致"
+          exit $fail
 
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
