@@ -6,6 +6,10 @@
 // 作为 Buildroot 的自定义内核 DTS（BR2_LINUX_KERNEL_CUSTOM_DTS_PATH），
 // 在 linux-xlnx 6.6 自带 zynq-zybo.dts（PS 外设）基础上叠加音频 PL 外设。
 //
+// ⚠️ 本文件是 zybo-linux 仓 kernel/zybo-audio.dts 的**副本**（保留副本是为了
+//    Buildroot 构建自包含/可复现）。权威版本在 zybo-linux，改动请先改那边再同步过来；
+//    CI 有 "Check DTS sync" 步骤会自动比对两份，漂移会直接构建失败。
+//
 // 与硬件/BD 对应关系（build_bd.tcl + zybo_audio.xdc）：
 //   axi_gpio  @0x4120_0000   4bit 按键输入
 //   axi_iic   @0x4160_0000   PL I2C → SSM2603 @0x1A
@@ -59,7 +63,19 @@
     axi_iic_0: i2c@41600000 {             /* PL I2C → codec（⚠ 非 PS I2C） */
         compatible = "xlnx,xps-iic-2.00.a";
         reg = <0x41600000 0x10000>;
+        /* 必须显式写 interrupt-parent：zynq-7000.dtsi 只在 amba 节点上设了
+         * interrupt-parent=<&intc>，根节点没有；PL 节点挂在根节点下时
+         * of_irq_find_parent() 向上找不到，platform_get_irq() 返回 -ENXIO，
+         * xiic-i2c probe 直接失败（现象：无 I2C 适配器 → codec 不 probe →
+         * simple-audio-card 一直 deferred probe，"No soundcards found"）。
+         * DT 的 SPI 号相对 GIC SPI 基址 32：29 + 32 = 61 = IRQ_F2P[0]。 */
+        interrupt-parent = <&intc>;
         interrupts = <0 29 4>;            /* IRQ_F2P[0] */
+        /* xiic-i2c 用 devm_clk_get_enabled(dev, NULL) 取第一个时钟（= S_AXI_ACLK
+         * = FCLK_CLK0 100MHz），缺了会 probe 失败：
+         *   "error -ENOENT: failed to enable input clock."
+         * 该时钟同时决定 SCL 分频（clk_get_rate 作 input_clk）。 */
+        clocks = <&clkc 15>;              /* FCLK_CLK0 = 100MHz */
         #address-cells = <1>;
         #size-cells = <0>;
         clock-frequency = <100000>;

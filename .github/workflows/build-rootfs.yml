@@ -39,6 +39,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check DTS sync with zybo-linux (canonical)
+        run: |
+          # external/overlays/zybo-audio.dts 是 zybo-linux 仓 kernel/zybo-audio.dts 的副本
+          # （保留副本 = 构建自包含/可复现）。权威版本在 zybo-linux，这里做漂移检测：
+          # 2026-09-10 曾因两份副本不同步（缺 interrupt-parent / clocks）导致 CI 编出的
+          # DTB 上板后 codec 不 probe。比较时去掉注释与空行（副本头部多一段说明）。
+          curl -fsSL -o /tmp/zybo-audio-canonical.dts \
+            https://raw.githubusercontent.com/xufooo/zybo-linux/main/kernel/zybo-audio.dts
+          strip() { grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$'; }
+          if ! diff -u <(strip /tmp/zybo-audio-canonical.dts) \
+                       <(strip external/overlays/zybo-audio.dts); then
+            echo "::error::external/overlays/zybo-audio.dts 与 zybo-linux 权威版本已漂移，请同步"
+            exit 1
+          fi
+          echo "DTS 与 zybo-linux 权威版本一致"
+
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
