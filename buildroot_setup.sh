@@ -9,7 +9,7 @@
 #   ./buildroot_setup.sh build    — Build everything (kernel + u-boot + rootfs)
 #   ./buildroot_setup.sh rebuild  — Incremental rebuild (kernel only)
 #   ./buildroot_setup.sh clean    — Clean build artifacts
-#   ./buildroot_setup.sh sd-card  — Show SD card flashing instructions
+#   ./buildroot_setup.sh sd-card  — Show SD card assembly notes
 #
 # Quick start:
 #   cd ZYBO/projects/audio_player/linux/buildroot
@@ -106,7 +106,8 @@ do_build() {
         echo "  ${f}"
     done
     echo ""
-    info "SD card image (ready to flash):  output/images/sdcard.img"
+    info "Note: no sdcard.img is built — genimage is disabled in the defconfig."
+    info "      Run './buildroot_setup.sh sd-card' for SD card assembly notes."
     echo ""
 }
 
@@ -139,28 +140,34 @@ do_clean() {
 do_sd_card() {
     cat << 'EOF'
 
-╔═══════════════════════════════════════════════════════════════╗
-║  SD Card Flashing Instructions                               ║
-╠═══════════════════════════════════════════════════════════════╣
-║                                                               ║
-║  Method 1: Flash the sdcard.img (recommended):               ║
-║                                                               ║
-║    sudo dd if=output/images/sdcard.img \                     ║
-║            of=/dev/sdX bs=4M conv=fsync status=progress       ║
-║                                                               ║
-║  Method 2: Manual copy:                                       ║
-║    1. Create FAT32 partition (≥64MB) + ext4 partition (≥256MB) ║
-║    2. Copy to FAT32:                                          ║
-║       - BOOT.BIN                                               ║
-║       - uImage                                                 ║
-║       - zybo-audio.dtb                                       ║
-║    3. Extract to ext4:                                        ║
-║       - sudo tar -xf rootfs.tar -C /mount/point                ║
-║                                                               ║
-║  On ZYBO Rev B:                                             ║
-║    Boot mode jumpers: JP4 → SD boot（板上丝印 1-0-0-0）        ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════════════╗
+║  SD Card Assembly Notes                                                ║
+╠════════════════════════════════════════════════════════════════════════╣
+║                                                                        ║
+║  This tree does NOT produce a flashable sdcard.img: genimage is        ║
+║  disabled in the defconfig. See external/board/zybo-revb/genimage.cfg  ║
+║  for the partition layout template kept for later use.                 ║
+║                                                                        ║
+║  Buildroot output (output/images/):                                    ║
+║    boot.bin         U-Boot SPL (rename to BOOT.BIN on the card)        ║
+║    u-boot.img       U-Boot proper                                      ║
+║    uImage           Linux kernel                                       ║
+║    zybo-audio.dtb   device tree                                        ║
+║    rootfs.ext2      ext4 root filesystem                               ║
+║    rootfs.tar       root filesystem as a tar archive                   ║
+║                                                                        ║
+║  Manual assembly:                                                      ║
+║    1. Create FAT32 (>=64MB) + ext4 (>=256MB) partitions                ║
+║    2. Copy to FAT32: BOOT.BIN, u-boot.img, uImage, zybo-audio.dtb      ║
+║    3. Extract to ext4:                                                 ║
+║         sudo tar -xf rootfs.tar -C /mount/point                        ║
+║                                                                        ║
+║  The release sdcard.img is assembled by the zybo-debian repository.    ║
+║                                                                        ║
+║  On ZYBO Rev B:                                                        ║
+║    Boot mode jumpers: JP4 -> SD boot (silkscreen 1-0-0-0)              ║
+║                                                                        ║
+╚════════════════════════════════════════════════════════════════════════╝
 
 EOF
 }
@@ -188,11 +195,11 @@ case "${1:-help}" in
     *)
         echo "Usage: $0 {setup|build|rebuild|clean|sd-card}"
         echo ""
-        echo "  setup    — Clone Buildroot 2024.02 + create defconfig"
+        echo "  setup    — Clone Buildroot 2026.02.3 + create defconfig"
         echo "  build    — Full build (kernel + u-boot + rootfs)"
         echo "  rebuild  — Incremental rebuild (kernel + rootfs only)"
         echo "  clean    — Clean build artifacts"
-        echo "  sd-card  — SD card flashing instructions"
+        echo "  sd-card  — SD card assembly notes"
         echo ""
         echo "Workflow:"
         echo "  1. ./buildroot_setup.sh setup"
