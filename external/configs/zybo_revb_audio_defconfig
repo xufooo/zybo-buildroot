@@ -1,4 +1,4 @@
-# Buildroot Defconfig — ZYBO Audio DSP (Buildroot 2024.02)
+# Buildroot Defconfig — ZYBO Audio DSP (Buildroot 2026.02.3)
 # Architecture: ARM Cortex-A9, Zynq-7000 XC7Z010
 BR2_arm=y
 BR2_cortex_a9=y
@@ -6,7 +6,7 @@ BR2_ARM_ENABLE_NEON=y
 BR2_ARM_ENABLE_VFP=y
 BR2_ARM_FPU_VFPV3D16=y
 
-# Toolchain: Bootlin 预编译外部工具链（省去自建 gcc/glibc；Buildroot 2024.02 内置 2023.11-1）
+# Toolchain: Bootlin 预编译外部工具链（省去自建 gcc/glibc；Buildroot 2026.02.3 内置的 Bootlin stable）
 BR2_TOOLCHAIN_EXTERNAL=y
 BR2_TOOLCHAIN_EXTERNAL_BOOTLIN=y
 BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_ARMV7_EABIHF_GLIBC_STABLE=y
