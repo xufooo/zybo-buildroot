@@ -2,9 +2,9 @@
 
 Buildroot rootfs for a ZYBO (Zynq-7000) audio player.
 
-Builds a complete SD-card boot set — U-Boot SPL, U-Boot, kernel, device tree and
-root filesystem — from the `BR2_EXTERNAL` tree in this repository. The PL
-bitstream comes from Vivado and is added when the SD card is assembled.
+Builds the kernel, device tree, U-Boot and root filesystem from the `BR2_EXTERNAL`
+tree in this repository. The boot set is published in the **FSBL** form; the U-Boot
+SPL route (`boot.bin`) is kept as an optional/historical path.
 
 ## What it builds
 
@@ -19,9 +19,11 @@ bitstream comes from Vivado and is added when the SD card is assembled.
 | Packages | `alsa-utils` (aplay, amixer, speaker-test) and `i2c-tools` |
 | Root filesystem | ext4 (256 MB) and tar |
 
-`BOOT.BIN` is the U-Boot SPL image (`spl/boot.bin`); no FSBL or bootgen is
-required. The PL bitstream is loaded by U-Boot from the boot script
-(`fpga loadb`).
+The published boot set uses the **FSBL** form: `BOOT.BIN` = FSBL + PL bitstream +
+U-Boot, assembled with Vivado + bootgen, with `BOOT.BIN`, `uImage` and `boot.scr`
+on the boot partition. The U-Boot SPL route — `BOOT.BIN` being the SPL's
+`spl/boot.bin`, with the bitstream loaded by U-Boot via `fpga loadb` — is kept as
+an optional/historical path and is what `make_bootbin.sh` assembles.
 
 ## Layout
 
@@ -74,7 +76,7 @@ that touch `external/**` or `buildroot_setup.sh`. The `linux-images` artifact
 holds `output/images/`:
 
 ```
-boot.bin        # BOOT.BIN — U-Boot SPL
+boot.bin        # U-Boot SPL image (used by the SPL boot route)
 u-boot.img      # U-Boot proper
 uImage          # kernel
 zybo-audio.dtb  # device tree with the audio nodes
@@ -84,8 +86,10 @@ rootfs.tar      # root filesystem as a tar archive
 
 ## Assembling an SD card
 
-`make_bootbin.sh` copies the boot images next to a bitstream and generates the
-U-Boot boot script:
+`make_bootbin.sh` assembles the SPL-route boot set: it copies the boot images next
+to a bitstream and generates the U-Boot boot script. The published FSBL form puts
+`BOOT.BIN` (FSBL + bitstream + U-Boot), `uImage` and `boot.scr` on the boot
+partition instead.
 
 ```bash
 ./make_bootbin.sh --bit zybo_audio_wrapper.bit \

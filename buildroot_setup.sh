@@ -12,7 +12,8 @@
 #   ./buildroot_setup.sh sd-card  — Show SD card assembly notes
 #
 # Quick start:
-#   cd ZYBO/projects/audio_player/linux/buildroot
+#   git clone https://github.com/xufooo/zybo-buildroot.git
+#   cd zybo-buildroot
 #   ./buildroot_setup.sh setup
 #   ./buildroot_setup.sh build
 # ============================================================================

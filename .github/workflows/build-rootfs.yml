@@ -1,15 +1,21 @@
 # ============================================================================
-# build-rootfs.yml — ZYBO Rev B 音频 Linux（Buildroot）GitHub Actions 构建
+# build-rootfs.yml — ZYBO Rev B audio Linux (Buildroot) GitHub Actions build
 # ============================================================================
-# 产物（artifact: linux-images）：
-#   boot.bin（=BOOT.BIN, U-Boot SPL）、u-boot.img、uImage、zybo-audio.dtb、
-#   rootfs.ext4、rootfs.tar
-# 说明：
-#   - Buildroot 2026.02.3（LTS）+ BR2_EXTERNAL=external（本仓库根）
-#   - 外部预编译工具链（Bootlin armv7-eabihf glibc stable）→ 跳过自建 gcc/glibc
-#   - Phase-1 精简包：alsa-utils + i2c-tools（MPD/AirPlay 后续增量加）
-#   - bitstream 不在 CI 生成（需 Vivado）：产物下载后本地 `make bootbin --bit ...` 组卡
-#   - runner: ubuntu-24.04（tar 1.35，满足 Buildroot ≥1.35 要求，免自建 host-tar）
+# Build artifacts (artifact: linux-images):
+#   boot.bin (the U-Boot SPL's spl/boot.bin; this is the SPL boot route),
+#   u-boot.img, uImage, zybo-audio.dtb, rootfs.ext4, rootfs.tar
+# The published image uses the FSBL form instead: BOOT.BIN = FSBL + PL bitstream +
+# U-Boot, assembled with Vivado + bootgen, and the boot partition holds BOOT.BIN,
+# uImage and boot.scr.
+# Notes:
+#   - Buildroot 2026.02.3 (LTS) + BR2_EXTERNAL=external (repository root)
+#   - prebuilt external toolchain (Bootlin armv7-eabihf glibc stable), so no
+#     self-built gcc/glibc
+#   - Phase-1 minimal package set: alsa-utils + i2c-tools (MPD/AirPlay added later)
+#   - the bitstream is not produced in CI (it needs Vivado): download the artifacts
+#     and assemble the card locally with `make_bootbin.sh --bit ...`
+#   - runner: ubuntu-24.04 (tar 1.35, meeting Buildroot's >=1.35 requirement, so no
+#     self-built host-tar)
 # ============================================================================
 name: Build ZYBO Linux Rootfs (Buildroot)
 
@@ -41,31 +47,32 @@ jobs:
 
       - name: Check DTS/config sync with zybo-linux (canonical)
         run: |
-          # external/overlays/zybo-audio.dts 与 external/board/zybo-revb/linux.fragment
-          # 都是 zybo-linux 仓里同名文件的副本（保留副本 = 构建自包含/可复现）。
-          # 权威版本在 zybo-linux，这里做漂移检测：2026-09-10 曾因 DTS 副本不同步
-          # （缺 interrupt-parent / clocks）导致 CI 编出的 DTB 上板后 codec 不 probe。
+          # external/overlays/zybo-audio.dts and external/board/zybo-revb/linux.fragment
+          # are copies of the same-named files in the zybo-linux repository (keeping
+          # copies makes the build self-contained/reproducible). zybo-linux is
+          # canonical; this step detects drift, because a stale DTS copy (missing
+          # interrupt-parent/clocks) silently produces a DTB whose codec never probes.
           fetch() {
             curl -fsSL -o "/tmp/canonical-$1" \
               "https://raw.githubusercontent.com/xufooo/zybo-linux/main/kernel/$1"
           }
           fail=0
-          # DTS：去掉注释与空行再比（副本头部多一段说明）
+          # DTS: strip comments and blank lines before comparing (the copy has an extra header note)
           fetch zybo-audio.dts
           strip() { grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$'; }
           if ! diff -u <(strip /tmp/canonical-zybo-audio.dts) \
                        <(strip external/overlays/zybo-audio.dts); then
-            echo "::error::external/overlays/zybo-audio.dts 与 zybo-linux 权威版本已漂移，请同步"
+            echo "::error::external/overlays/zybo-audio.dts has drifted from the zybo-linux canonical version; sync it"
             fail=1
           fi
-          # fragment：应当逐字节一致
+          # fragment: must be byte-identical
           fetch config.fragment
           if ! diff -u /tmp/canonical-config.fragment \
                        external/board/zybo-revb/linux.fragment; then
-            echo "::error::external/board/zybo-revb/linux.fragment 与 zybo-linux 权威版本已漂移，请同步"
+            echo "::error::external/board/zybo-revb/linux.fragment has drifted from the zybo-linux canonical version; sync it"
             fail=1
           fi
-          [ "$fail" = "0" ] && echo "DTS 与 config fragment 均与 zybo-linux 权威版本一致"
+          [ "$fail" = "0" ] && echo "DTS and config fragment both match the zybo-linux canonical versions"
           exit $fail
 
       - name: Free disk space
@@ -110,7 +117,7 @@ jobs:
 
       - name: Fix script permissions
         run: |
-          # git 可能丢失可执行位；Buildroot 直接执行 post-build 脚本，必须可执行
+          # git may lose the executable bit; Buildroot executes the post-build script directly, so it must be +x
           chmod +x external/board/zybo-revb/post-build.sh buildroot_setup.sh make_bootbin.sh 2>/dev/null || true
           ls -l external/board/zybo-revb/post-build.sh
 
