@@ -2,6 +2,8 @@
 # ============================================================================
 # make_bootbin.sh — assemble the ZYBO Rev B SD card boot files (SPL route, no FSBL/bootgen needed)
 # ============================================================================
+# NOTE: the released SD image uses the FSBL form instead (see README.md).
+#
 # Boot chain: BOOT.BIN (= U-Boot's spl/boot.bin, loaded directly by the BootROM)
 #         -> u-boot.img -> distro_bootcmd scans the FAT partition, finds boot.scr and runs it
 #         -> boot.scr programs the PL with fpga loadb, then boots the kernel with bootm

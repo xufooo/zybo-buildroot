@@ -150,16 +150,23 @@ do_sd_card() {
 ║  for the partition layout template kept for later use.                 ║
 ║                                                                        ║
 ║  Buildroot output (output/images/):                                    ║
-║    boot.bin         U-Boot SPL (rename to BOOT.BIN on the card)        ║
-║    u-boot.img       U-Boot proper                                      ║
-║    uImage           Linux kernel                                       ║
-║    zybo-audio.dtb   device tree                                        ║
+║    boot.bin         U-Boot SPL (SPL route only; not the release form)  ║
+║    u-boot.img       U-Boot proper (SPL route)                          ║
+║    uImage           Linux kernel (FIT)                                 ║
+║    zybo-audio.dtb   device tree (SPL route)                            ║
 ║    rootfs.ext2      ext4 root filesystem                               ║
 ║    rootfs.tar       root filesystem as a tar archive                   ║
 ║                                                                        ║
-║  Manual assembly:                                                      ║
+║  The released boot set uses the FSBL form: BOOT.BIN = FSBL + PL        ║
+║  bitstream + U-Boot, assembled with Vivado + bootgen. The boot         ║
+║  partition then holds exactly three files: BOOT.BIN, uImage and        ║
+║  boot.scr (the FSBL programs the PL; boot.scr only loads uImage and    ║
+║  boots it). The SPL route above -- boot.bin plus u-boot.img and        ║
+║  zybo-audio.dtb -- is historical/optional.                             ║
+║                                                                        ║
+║  Manual assembly (FSBL form):                                          ║
 ║    1. Create FAT32 (>=64MB) + ext4 (>=256MB) partitions                ║
-║    2. Copy to FAT32: BOOT.BIN, u-boot.img, uImage, zybo-audio.dtb      ║
+║    2. Copy to FAT32: BOOT.BIN, uImage, boot.scr                        ║
 ║    3. Extract to ext4:                                                 ║
 ║         sudo tar -xf rootfs.tar -C /mount/point                        ║
 ║                                                                        ║

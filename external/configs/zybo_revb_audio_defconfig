@@ -32,8 +32,11 @@ BR2_LINUX_KERNEL_CUSTOM_DTS_PATH="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/overlays/zybo-
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="zybo-audio"
 
 # Boot: U-Boot 2024.01 (generic Zynq-7000 config xilinx_zynq_virt + DEVICE_TREE=zynq-zybo)
-# BOOT.BIN = the SPL's spl/boot.bin (loaded directly by the BootROM, no FSBL/bootgen needed); the bitstream
-# is loaded by U-Boot's uEnv.txt with `fpga loadb` (same approach as the official meta-xilinx zybo-zynq7)
+# The released SD image uses the FSBL form: BOOT.BIN = FSBL + PL bitstream + U-Boot, assembled with
+# Vivado + bootgen, and the boot partition holds exactly three files (BOOT.BIN, uImage, boot.scr).
+# The PL is programmed by the FSBL; boot.scr only loads uImage (kernel + DTB FIT) and boots it.
+# The U-Boot SPL route below (BOOT.BIN = the SPL's spl/boot.bin, bitstream loaded by U-Boot via
+# `fpga loadb`) is kept as a historical/optional path -- see README.md.
 BR2_TARGET_UBOOT=y
 BR2_TARGET_UBOOT_BUILD_SYSTEM_KCONFIG=y
 BR2_TARGET_UBOOT_CUSTOM_GIT=y
