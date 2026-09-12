@@ -24,6 +24,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXTERNAL_DIR="${SCRIPT_DIR}/external"
 BUILDROOT_DIR="${SCRIPT_DIR}/buildroot"
 BUILDROOT_VERSION="2026.02.3"
+# Commit behind tag 2026.02.3 (resolved with git ls-remote); a tag can be
+# re-pointed or deleted upstream, a commit SHA cannot.
+BUILDROOT_COMMIT="679b9ead7620bbf193620d1ebf56f53c1764d37a"
 BUILDROOT_URL="https://github.com/buildroot/buildroot.git"
 DEFCONFIG_NAME="zybo_revb_audio_defconfig"
 JOBS="${JOBS:-$(nproc)}"
@@ -64,9 +67,13 @@ clone_buildroot() {
         return 0
     fi
 
-    info "Cloning Buildroot ${BUILDROOT_VERSION}..."
-    git clone --depth 1 --branch "${BUILDROOT_VERSION}" \
-        "${BUILDROOT_URL}" "${BUILDROOT_DIR}"
+    info "Cloning Buildroot ${BUILDROOT_VERSION} (${BUILDROOT_COMMIT})..."
+    # --branch does not accept a commit SHA, so create an empty repository and
+    # fetch exactly the pinned commit.
+    git init --quiet "${BUILDROOT_DIR}"
+    git -C "${BUILDROOT_DIR}" remote add origin "${BUILDROOT_URL}"
+    git -C "${BUILDROOT_DIR}" fetch --depth 1 origin "${BUILDROOT_COMMIT}"
+    git -C "${BUILDROOT_DIR}" checkout --quiet --detach FETCH_HEAD
 
     info "Buildroot cloned successfully"
 }

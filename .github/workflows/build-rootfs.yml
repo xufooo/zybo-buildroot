@@ -32,7 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Buildroot release, pinned to the commit behind tag 2026.02.3 (a tag can be
+  # re-pointed or deleted upstream, a commit SHA cannot).
   BUILDROOT_VERSION: '2026.02.3'
+  BUILDROOT_REF: '679b9ead7620bbf193620d1ebf56f53c1764d37a'
   BR_DIR: buildroot
   DL_DIR: ${{ github.workspace }}/br2-dl
 
@@ -102,10 +105,17 @@ jobs:
           key: br2-dl-${{ env.BUILDROOT_VERSION }}-${{ hashFiles('external/configs/*') }}
           restore-keys: br2-dl-${{ env.BUILDROOT_VERSION }}-
 
-      - name: Clone Buildroot
+      - name: Clone Buildroot at the pinned commit
         run: |
-          git clone --depth 1 --branch $BUILDROOT_VERSION \
-            https://github.com/buildroot/buildroot.git $BR_DIR
+          # --branch does not accept a commit SHA, so create an empty repository
+          # and fetch exactly the commit behind the pinned release tag.
+          git init --quiet $BR_DIR
+          cd $BR_DIR
+          git remote add origin https://github.com/buildroot/buildroot.git
+          git fetch --depth 1 origin $BUILDROOT_REF
+          git checkout --quiet --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$BUILDROOT_REF"
+          echo "buildroot $BUILDROOT_VERSION = $(git rev-parse HEAD)"
 
       - name: Configure (BR2_EXTERNAL + defconfig)
         run: |

@@ -17,11 +17,13 @@ BR2_TARGET_GENERIC_ISSUE="ZYBO Audio DSP"
 BR2_INIT_BUSYBOX=y
 BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_DEVTMPFS=y
 
-# Kernel: linux-xlnx 6.6 LTS (tag-pinned, Vitis 2024.1 official line + upstream stable fixes)
+# Kernel: linux-xlnx 6.6 LTS (Vitis 2024.1 official line + upstream stable fixes),
+# pinned to the commit SHA behind tag xlnx_rebase_v6.6_LTS_2024.1_merge_6.6.80
+# (a tag can be re-pointed upstream; a commit SHA cannot).
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_GIT=y
 BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Xilinx/linux-xlnx.git"
-BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="xlnx_rebase_v6.6_LTS_2024.1_merge_6.6.80"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="e29e392a451244a11aa3559738b6617536fde460"
 BR2_LINUX_KERNEL_DEFCONFIG="xilinx_zynq"
 BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/board/zybo-revb/linux.fragment"
 BR2_LINUX_KERNEL_UIMAGE=y
@@ -31,7 +33,8 @@ BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_CUSTOM_DTS_PATH="$(BR2_EXTERNAL_ZYBO_AUDIO_PATH)/overlays/zybo-audio.dts"
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="zybo-audio"
 
-# Boot: U-Boot 2024.01 (generic Zynq-7000 config xilinx_zynq_virt + DEVICE_TREE=zynq-zybo)
+# Boot: U-Boot 2024.01 (generic Zynq-7000 config xilinx_zynq_virt + DEVICE_TREE=zynq-zybo),
+# pinned to the commit SHA behind tag v2024.01.
 # The released SD image uses the FSBL form: BOOT.BIN = FSBL + PL bitstream + U-Boot, assembled with
 # Vivado + bootgen, and the boot partition holds exactly three files (BOOT.BIN, uImage, boot.scr).
 # The PL is programmed by the FSBL; boot.scr only loads uImage (kernel + DTB FIT) and boots it.
@@ -41,7 +44,8 @@ BR2_TARGET_UBOOT=y
 BR2_TARGET_UBOOT_BUILD_SYSTEM_KCONFIG=y
 BR2_TARGET_UBOOT_CUSTOM_GIT=y
 BR2_TARGET_UBOOT_CUSTOM_REPO_URL="https://source.denx.de/u-boot/u-boot.git"
-BR2_TARGET_UBOOT_CUSTOM_REPO_VERSION="v2024.01"
+# tag v2024.01 -> commit SHA (Buildroot accepts any git revision here, sha included)
+BR2_TARGET_UBOOT_CUSTOM_REPO_VERSION="866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e"
 BR2_TARGET_UBOOT_BOARD_DEFCONFIG="xilinx_zynq_virt"
 BR2_TARGET_UBOOT_CUSTOM_MAKEOPTS="DEVICE_TREE=zynq-zybo"
 BR2_TARGET_UBOOT_NEEDS_DTC=y
