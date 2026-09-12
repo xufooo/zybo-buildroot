@@ -118,6 +118,14 @@ console=ttyPS0,115200 root=/dev/mmcblk0p2 rootwait rw
 `external/board/zybo-revb/genimage.cfg` holds a two-partition layout template
 (FAT32 boot + ext4 root); genimage is not currently enabled in the defconfig.
 
+## License
+
+This repository is licensed under the **GNU General Public License, version 2**
+(GPL-2.0); see [LICENSE](LICENSE) for the full text. The components it builds
+(U-Boot, the Linux kernel, Buildroot and the rootfs packages) keep their own
+licenses, and their corresponding source is documented in
+[THIRD-PARTY.md](THIRD-PARTY.md).
+
 ## Related repositories
 
 - Kernel: [zybo-linux](https://github.com/xufooo/zybo-linux)
