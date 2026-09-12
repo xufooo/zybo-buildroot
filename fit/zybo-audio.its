@@ -1,0 +1,53 @@
+/*
+ * zybo-audio.its -- FIT image description (kernel + dtb)
+ *
+ * Purpose: bind the kernel and the device tree into a single file that bootm
+ * reads directly. The bitstream is still a separate file at this point
+ * (programmed by "fpga loadb" in boot.scr) -- this is the form the current
+ * U-Boot already boots. See zybo-audio-with-fpga.its for a form that also
+ * embeds the bitstream.
+ *
+ * Build: mkimage -f zybo-audio.its fit.itb
+ *        (zImage / zybo-audio.dtb must be in the same directory as this file)
+ */
+/dts-v1/;
+
+/ {
+	description = "ZYBO audio player (kernel + dtb)";
+	#address-cells = <1>;
+
+	images {
+		kernel {
+			description = "Linux 6.6.80-xilinx";
+			data = /incbin/("zImage");
+			type = "kernel";
+			arch = "arm";
+			os = "linux";
+			compression = "none";
+			/* Matches the existing uImage header (Load/Entry = 0x8000),
+			 * i.e. the addresses the board boots with today */
+			load = <0x00008000>;
+			entry = <0x00008000>;
+			hash-1 { algo = "sha256"; };
+		};
+
+		fdt {
+			description = "ZYBO Rev B device tree";
+			data = /incbin/("zybo-audio.dtb");
+			type = "flat_dt";
+			arch = "arm";
+			compression = "none";
+			load = <0x02A00000>;
+			hash-1 { algo = "sha256"; };
+		};
+	};
+
+	configurations {
+		default = "conf";
+		conf {
+			description = "ZYBO audio";
+			kernel = "kernel";
+			fdt = "fdt";
+		};
+	};
+};

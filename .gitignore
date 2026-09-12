@@ -3,3 +3,13 @@ buildroot/
 br2-dl/
 output/
 sdcard-boot/
+
+# FSBL build tree and Vivado-generated files
+fsbl/work/
+fsbl/.Xil/
+*.xsa
+*.bit
+*.itb
+
+# mkimage-generated U-Boot script (built from fit/boot-fit.cmd)
+fit/*.scr

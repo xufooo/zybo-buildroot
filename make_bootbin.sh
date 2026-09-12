@@ -18,6 +18,7 @@
 # Usage:
 #   ./make_bootbin.sh [--bit <*.bit>] [--images <dir>] [--out <dir>] [--mkimage <path>]
 #   mkimage source: $MKIMAGE -> system mkimage -> ../.tools/bin/mkimage
+#   FIT form: --fit (kernel+dtb) / --with-fpga (also embed the bitstream) / --fallback (transition safety net)
 # ============================================================================
 set -euo pipefail
 
@@ -27,6 +28,10 @@ IMAGES_DIR="${SCRIPT_DIR}/buildroot/output/images"
 OUT_DIR="${SCRIPT_DIR}/sdcard-boot"
 BIT_FILE=""
 MKIMAGE="${MKIMAGE:-}"
+# FIT form (end goal): kernel(+dtb)(+bitstream) packed into a single fit.itb
+FIT=0            # --fit: kernel+dtb go into the FIT; the bitstream is still loaded by fpga loadb in boot.scr
+WITH_FPGA=0      # --with-fpga: the bitstream also goes into the FIT (needs U-Boot FIT-FPGA support, unverified)
+FALLBACK=0       # --fallback: also keep uImage/dtb and write a "FIT first + legacy fallback" boot.cmd
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -34,6 +39,9 @@ while [ $# -gt 0 ]; do
         --images)   IMAGES_DIR="$2"; shift 2 ;;
         --out)      OUT_DIR="$2"; shift 2 ;;
         --mkimage)  MKIMAGE="$2"; shift 2 ;;
+        --fit)        FIT=1; shift ;;
+        --with-fpga)  FIT=1; WITH_FPGA=1; shift ;;
+        --fallback)   FALLBACK=1; shift ;;
         -h|--help)  sed -n '2,26p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1"; exit 1 ;;
     esac
@@ -65,19 +73,95 @@ SPL_BIN="${IMAGES_DIR}/boot.bin"
 UBOOT_IMG="${IMAGES_DIR}/u-boot.img"
 UIMAGE="${IMAGES_DIR}/uImage"
 DTB="${IMAGES_DIR}/zybo-audio.dtb"
+ZIMAGE="${IMAGES_DIR}/zImage"
 
-for f in "${SPL_BIN}" "${UBOOT_IMG}" "${UIMAGE}" "${DTB}"; do
-    [ -f "$f" ] || die "missing artifact: $f (run the Buildroot build first)"
-done
+if [ "$FIT" = "1" ]; then
+    # The FIT must contain the RAW kernel (zImage), not uImage: uImage is a legacy
+    # header + zImage, so nesting it adds a second header. zybo-linux/Buildroot both emit zImage.
+    for f in "${SPL_BIN}" "${UBOOT_IMG}" "${ZIMAGE}" "${DTB}"; do
+        [ -f "$f" ] || die "missing artifact: $f (--fit needs zImage; build the kernel first)"
+    done
+else
+    for f in "${SPL_BIN}" "${UBOOT_IMG}" "${UIMAGE}" "${DTB}"; do
+        [ -f "$f" ] || die "missing artifact: $f (run the Buildroot build first)"
+    done
+fi
 
 # --- Assemble ---------------------------------------------------------------
 mkdir -p "${OUT_DIR}"
 cp -f "${SPL_BIN}"   "${OUT_DIR}/BOOT.BIN"
 cp -f "${UBOOT_IMG}" "${OUT_DIR}/u-boot.img"
-cp -f "${UIMAGE}"    "${OUT_DIR}/uImage"
-cp -f "${DTB}"       "${OUT_DIR}/zybo-audio.dtb"
-cp -f "${BIT_FILE}"  "${OUT_DIR}/system.bit"
 
+if [ "$FIT" = "1" ]; then
+    # --- FIT form: stage zImage/dtb/(bit) with the .its in a temp dir, then run mkimage ---
+    command -v dtc >/dev/null 2>&1 \
+        || die "dtc not found (needed by mkimage -f); install device-tree-compiler"
+    IDIR="$(mktemp -d)"; trap 'rm -rf "$IDIR"' EXIT
+    cp -f "${ZIMAGE}" "${IDIR}/zImage"
+    cp -f "${DTB}"    "${IDIR}/zybo-audio.dtb"
+    if [ "$WITH_FPGA" = "1" ]; then
+        cp -f "${BIT_FILE}" "${IDIR}/system.bit"
+        cp -f "${SCRIPT_DIR}/fit/zybo-audio-with-fpga.its" "${IDIR}/fit.its"
+        info "FIT form: kernel + dtb + **bitstream** (needs U-Boot FIT-FPGA support)"
+    else
+        cp -f "${SCRIPT_DIR}/fit/zybo-audio.its" "${IDIR}/fit.its"
+        cp -f "${BIT_FILE}" "${OUT_DIR}/system.bit"
+        info "FIT form: kernel + dtb (the bitstream is still loaded by boot.scr)"
+    fi
+    ( cd "$IDIR" && "${MKIMAGE}" -f fit.its "${OUT_DIR}/fit.itb" >/dev/null ) \
+        || die "mkimage -f failed"
+    info "fit.itb generated ($(du -h "${OUT_DIR}/fit.itb" | cut -f1))"
+    [ "$FALLBACK" = "1" ] && { cp -f "${UIMAGE}" "${OUT_DIR}/uImage"; cp -f "${DTB}" "${OUT_DIR}/zybo-audio.dtb"; }
+else
+    cp -f "${UIMAGE}"    "${OUT_DIR}/uImage"
+    cp -f "${DTB}"       "${OUT_DIR}/zybo-audio.dtb"
+    cp -f "${BIT_FILE}"  "${OUT_DIR}/system.bit"
+fi
+
+# --- boot.cmd -> boot.scr (U-Boot script; distro_bootcmd runs it automatically) ---
+if [ "$FIT" = "1" ] && [ "$WITH_FPGA" = "1" ]; then
+    # The bitstream is inside the FIT: bootm programs the PL first, then starts the kernel (needs U-Boot FIT-FPGA support)
+    cat > "${OUT_DIR}/boot.cmd" <<'EOF'
+# ZYBO Rev B audio player boot script (FIT three-in-one: kernel+dtb+bitstream)
+echo "== ZYBO audio: loading FIT (kernel + dtb + bitstream) =="
+fatload mmc 0:1 0x2000000 fit.itb
+setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rootwait rw
+bootm 0x2000000
+EOF
+elif [ "$FIT" = "1" ] && [ "$FALLBACK" = "1" ]; then
+    # Transition-period board testing: FIT first, fall back to the legacy path; on success /proc/cmdline carries zybo.fit=1
+    cat > "${OUT_DIR}/boot.cmd" <<'EOF'
+# ZYBO Rev B audio player boot script (FIT first + legacy fallback)
+echo "== ZYBO audio: try FIT =="
+if fatload mmc 0:1 0x2000000 fit.itb; then
+    fatload mmc 0:1 0x100000 system.bit
+    fpga loadb 0 0x100000 ${filesize}
+    setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rootwait rw zybo.fit=1
+    bootm 0x2000000
+    echo "!! FIT bootm failed -> fall back"
+fi
+echo "== ZYBO audio: legacy boot =="
+fatload mmc 0:1 0x100000 system.bit
+fpga loadb 0 0x100000 ${filesize}
+fatload mmc 0:1 0x3000000 uImage
+fatload mmc 0:1 0x2A00000 zybo-audio.dtb
+setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rootwait rw
+bootm 0x3000000 - 0x2A00000
+EOF
+elif [ "$FIT" = "1" ]; then
+    # FIT carries kernel+dtb; the bitstream stays a separate file
+    cat > "${OUT_DIR}/boot.cmd" <<'EOF'
+# ZYBO Rev B audio player boot script (FIT: kernel+dtb; bitstream loaded separately)
+echo "== ZYBO audio: loading FPGA bitstream =="
+fatload mmc 0:1 0x100000 system.bit
+fpga loadb 0 0x100000 ${filesize}
+
+echo "== ZYBO audio: loading FIT (kernel + dtb) =="
+fatload mmc 0:1 0x2000000 fit.itb
+setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rootwait rw
+bootm 0x2000000
+EOF
+else
 # --- boot.cmd -> boot.scr (U-Boot script; distro_bootcmd runs it automatically) ---
 cat > "${OUT_DIR}/boot.cmd" <<'EOF'
 # ZYBO Rev B audio player boot script (executed by distro_bootcmd)
@@ -92,6 +176,7 @@ fatload mmc 0:1 0x2A00000 zybo-audio.dtb
 setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rootwait rw
 bootm 0x3000000 - 0x2A00000
 EOF
+fi
 "${MKIMAGE}" -A arm -T script -C none -n "zybo-audio boot script" \
     -d "${OUT_DIR}/boot.cmd" "${OUT_DIR}/boot.scr" >/dev/null
 info "boot.scr generated ($(basename "${MKIMAGE}"))"

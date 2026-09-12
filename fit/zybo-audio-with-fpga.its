@@ -1,0 +1,79 @@
+/*
+ * zybo-audio-with-fpga.its -- FIT image description (kernel + dtb + bitstream,
+ * the target combined form)
+ *
+ * Prerequisite (NOT verified yet): U-Boot must support taking an FPGA image
+ * from the FIT and programming the PL automatically, i.e. the image type
+ * "fpga" plus compatible "u-boot,fpga-legacy" path. The U-Boot currently on the
+ * board does not contain the related strings (it only has the "fpga loadb"
+ * command), so this form requires rebuilding U-Boot with FIT-FPGA support
+ * first. Until that is verified, use zybo-audio.its (kernel+dtb) together with
+ * "fpga loadb" in boot.scr.
+ *
+ * Build: mkimage -f zybo-audio-with-fpga.its fit.itb
+ *        (zImage / zybo-audio.dtb / system.bit.bin must be in the same
+ *         directory as this file)
+ */
+/dts-v1/;
+
+/ {
+	description = "ZYBO audio player (kernel + dtb + bitstream)";
+	#address-cells = <1>;
+
+	images {
+		kernel {
+			description = "Linux 6.6.80-xilinx";
+			data = /incbin/("zImage");
+			type = "kernel";
+			arch = "arm";
+			os = "linux";
+			compression = "none";
+			load = <0x00008000>;
+			entry = <0x00008000>;
+			hash-1 { algo = "sha256"; };
+		};
+
+		fdt {
+			description = "ZYBO Rev B device tree";
+			data = /incbin/("zybo-audio.dtb");
+			type = "flat_dt";
+			arch = "arm";
+			compression = "none";
+			load = <0x02A00000>;
+			hash-1 { algo = "sha256"; };
+		};
+
+		fpga {
+			description = "PL bitstream (DSP)";
+			data = /incbin/("system.bit.bin");
+			type = "fpga";
+			arch = "arm";
+			compression = "none";
+			load = <0x01000000>;
+			/* Required by the upstream example doc/usage/fit/multi-with-fpga.rst;
+			 * without it the node is skipped silently (observed on hardware: the
+			 * log stops after "console enabled" and the boot hangs) */
+			compatible = "u-boot,fpga-legacy";
+			/* The bitstream must be the **.bin** form, not .bit: this path goes
+			 * through fpga_load() -> zynq_validate_bitstream(), which scans for
+			 * the Xilinx sync word from the START of the buffer
+			 * (drivers/fpga/zynqpl.c). A .bit file has a few hundred bytes of
+			 * ASCII header in front, so the comparison fails with "Bitstream is
+			 * not validated yet". Generate the .bin with:
+			 *   bootgen -image bit2bin.bif -arch zynq -process_bitstream bin
+			 * Note also that the function requires a buffer address >= 1MB. */
+			hash-1 { algo = "sha256"; };
+		};
+	};
+
+	configurations {
+		default = "conf";
+		conf {
+			description = "ZYBO audio";
+			kernel = "kernel";
+			fdt = "fdt";
+			/* The bitstream is a loadable: bootm programs the PL before starting the kernel */
+			loadables = "fpga";
+		};
+	};
+};
